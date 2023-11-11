@@ -103,9 +103,23 @@ def topK(score):
         top_wordid = [[0, 2, 3], [2, 1, 3]]  
 
     """
-    top_score, top_wordid = score.max(dim = 2)
-    top_score, top_beamid = torch.sort(top_score, dim = 1, descending=True)
-    top_wordid = torch.gather(top_wordid, dim=1, index=top_beamid)
+    # top_score, top_wordid = score.max(dim = 2)
+    # top_score, top_beamid = torch.sort(top_score, dim = 1, descending=True)
+    # top_wordid = torch.gather(top_wordid, dim=1, index=top_beamid)
+    # return top_score, top_beamid, top_wordid
+    batch_size, beam_size, vocab_size = score.shape
+    top_score = torch.empty(batch_size,beam_size).type(torch.float)
+    top_beamid = torch.empty(batch_size,beam_size).type(torch.long)
+    top_wordid = torch.empty(batch_size,beam_size).type(torch.long)
+    for batch in range(batch_size):
+        score_batch = score[batch].view(-1)
+        topKscores, unparsed_indices = torch.topk(score_batch, beam_size)
+        word_indices = unparsed_indices % vocab_size
+        beam_indices = unparsed_indices // vocab_size
+        top_score[batch] = topKscores
+        top_beamid[batch] = beam_indices
+        top_wordid[batch] = word_indices
+
     return top_score, top_beamid, top_wordid
 
  
@@ -138,8 +152,12 @@ def select_hiddens_by_beams(hiddens, beam_id):
                                         [0.9372, 0.4993, 0.5471, 0.9169],
                                         [0.9372, 0.4993, 0.5471, 0.9169]]])
     """
-    expanded_beam_id = beam_id.unsqueeze(2).expand(-1, -1, hiddens.size(2))
-    new_hiddens = torch.gather(hiddens, 1, expanded_beam_id)
+
+    batch_sz, beam_sz = beam_id.shape
+    new_hiddens = torch.zeros_like(hiddens)
+    for i in range(batch_sz):
+        for j in range(beam_sz):
+            new_hiddens[i][j] = hiddens[i][beam_id[i][j]]
     return new_hiddens
     # raise NotImplementedError
 
@@ -158,6 +176,22 @@ def extract_sequences(top_score, top_wordids, top_beamids):
     Example: 
         See inputs and expected outputs in test_extract_sequences().
     """
-    raise NotImplementedError
+    batch_size, beam_size =  top_score.shape
+    decode_max_length = len(top_wordids)
+    sequences = torch.LongTensor(batch_size, beam_size, decode_max_length)
+    
+    for i in range(batch_size):
+        for j in range(beam_size):
+            beam_selected = j
+            for k in range(decode_max_length-1, -1, -1):
+                # print(i, j, k)
+                sequences[i][j][k] = top_wordids[k][i][beam_selected]
+                beam_selected = top_beamids[k][i][beam_selected]
+
+    return sequences, top_score
+
+
+
+    
 
  
