@@ -101,8 +101,16 @@ def topK(score):
         top_score = [[-0.1, -0.2, -0.3], [-0.2, -0.3, -0.4]]
         top_beamid = [[0, 2, 1], [2, 0, 1]]
         top_wordid = [[0, 2, 3], [2, 1, 3]]  
+
     """
-    raise NotImplementedError
+    top_score, top_wordid = score.max(dim = 2)
+    top_score, top_beamid = torch.sort(top_score, dim = 1, descending=True)
+    top_wordid = torch.gather(top_wordid, dim=1, index=top_beamid)
+    return top_score, top_beamid, top_wordid
+
+ 
+
+    # raise NotImplementedError
 
 
 def select_hiddens_by_beams(hiddens, beam_id):
@@ -130,7 +138,10 @@ def select_hiddens_by_beams(hiddens, beam_id):
                                         [0.9372, 0.4993, 0.5471, 0.9169],
                                         [0.9372, 0.4993, 0.5471, 0.9169]]])
     """
-    raise NotImplementedError
+    expanded_beam_id = beam_id.unsqueeze(2).expand(-1, -1, hiddens.size(2))
+    new_hiddens = torch.gather(hiddens, 1, expanded_beam_id)
+    return new_hiddens
+    # raise NotImplementedError
 
 
 def extract_sequences(top_score, top_wordids, top_beamids):
